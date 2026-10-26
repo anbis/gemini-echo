@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gemini Echo</title>
+<style>
+:root{
+  --bg:#f5f6f8;--card:#fff;--ink:#16181d;--muted:#667085;--line:#e4e7ec;
+  --accent:#3b6ef5;--accent-ink:#fff;--ok:#12805c;--bad:#c4320a;--warn:#b54708;
+  --field:#fff;--chip:#eef2ff;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f1115;--card:#171a21;--ink:#e8eaf0;--muted:#98a2b3;--line:#2a2f3a;
+  --accent:#6d93ff;--accent-ink:#0b0d12;--ok:#3ccb8f;--bad:#ff7a59;--warn:#f5b041;
+  --field:#11141a;--chip:#1f2638;color-scheme:dark;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+main{max-width:760px;margin:0 auto;padding:20px 16px 110px}
+header{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.logo{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#4285f4,#9b72cb 55%,#d96570);flex:none}
+h1{font-size:20px;margin:0}
+.sub{color:var(--muted);font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.card h2{font-size:15px;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+.card h2 small{color:var(--muted);font-weight:400;font-size:12px;margin-left:auto}
+label{display:block;font-size:13px;color:var(--muted);margin:12px 0 5px}
+label:first-of-type{margin-top:0}
+input[type=text],input[type=password],input[type=number],select,textarea{
+  width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--field);color:var(--ink);font:inherit}
+textarea{min-height:120px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:520px){.row{grid-template-columns:1fr}}
+.range{display:flex;align-items:center;gap:10px}
+.range input{flex:1;accent-color:var(--accent)}
+.range output{min-width:58px;text-align:right;font-variant-numeric:tabular-nums}
+.hint{font-size:12px;color:var(--muted);margin-top:5px}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;border-radius:9px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.status{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;font-size:13px;color:var(--muted)}
+.status b{color:var(--ink);font-weight:600}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;background:var(--chip);color:var(--ink);font-weight:600;font-size:13px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.pill.idle .dot{background:var(--ok)} .pill.connecting .dot{background:var(--warn)} .pill.active .dot{background:var(--accent);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.3}}
+.err{color:var(--bad);font-size:13px;margin-top:8px}
+.models{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.model{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;padding:9px 12px;border-top:1px solid var(--line)}
+.model:first-child{border-top:0}
+.model input{accent-color:var(--accent)}
+.model .id{font-size:12px;color:var(--muted);word-break:break-all}
+.model .res{font-size:12px;text-align:right;max-width:190px}
+.ok{color:var(--ok)} .bad{color:var(--bad)}
+.model button{padding:4px 10px;font-size:13px}
+.empty{padding:14px;color:var(--muted);font-size:13px}
+.toggle{display:flex;align-items:center;gap:10px;margin-top:12px}
+.toggle input{width:18px;height:18px;accent-color:var(--accent)}
+.toggle label{margin:0;color:var(--ink);font-size:14px}
+.savebar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);
+  padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px))}
+.savebar .in{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.savebar .msg{flex:1;font-size:13px;color:var(--muted)}
+.banner{background:#fff4e5;color:#7a2e0e;border:1px solid #f5c08b;border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:14px}
+@media (prefers-color-scheme:dark){.banner{background:#2b1d0e;color:#f8c48a;border-color:#6b4419}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="logo"></div>
+    <div><h1>Gemini Echo</h1><div class="sub">Atom EchoS3R · Gemini Live voice assistant</div></div>
+  </header>
+
+  <div class="banner" id="apBanner" hidden>Setup mode: the device couldn't join Wi-Fi. Enter your network below and save — it will restart and connect.</div>
+
+  <section class="card">
+    <h2>Status <small id="fw"></small></h2>
+    <div class="status">
+      <span class="pill" id="state"><span class="dot"></span><span id="stateTxt">…</span></span>
+      <span>Wi-Fi <b id="ssid">–</b></span>
+      <span>Signal <b id="rssi">–</b></span>
+      <span>IP <b id="ip">–</b></span>
+      <span>Up <b id="uptime">–</b></span>
+    </div>
+    <div class="err" id="lastErr" hidden></div>
+    <div class="btns" style="margin-top:12px">
+      <button id="talkBtn">🎙 Talk / stop</button>
+      <button id="beepBtn">🔔 Test speaker</button>
+      <button id="restartBtn">Restart</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Model <small>Live models available to your API key</small></h2>
+    <div class="models" id="models"><div class="empty">Loading models…</div></div>
+    <div class="btns" style="margin-top:10px">
+      <button id="testAll">Test all models</button>
+      <button id="reloadModels">Refresh list</button>
+    </div>
+    <div class="hint">Test opens a real Live session with the selected voice and reports whether it starts (quota, access and voice errors show here).</div>
+  </section>
+
+  <section class="card">
+    <h2>Voice &amp; behaviour</h2>
+    <div class="row">
+      <div>
+        <label for="voice">Voice</label>
+        <select id="voice"></select>
+      </div>
+      <div>
+        <label for="language">Reply language</label>
+        <input type="text" id="language" list="langs" placeholder="auto">
+        <datalist id="langs">
+          <option value="auto"><option value="Ukrainian"><option value="English"><option value="Russian">
+          <option value="Latvian"><option value="Polish"><option value="German"><option value="Spanish"><option value="French">
+        </datalist>
+      </div>
+    </div>
+    <label for="prompt">System prompt</label>
+    <textarea id="prompt"></textarea>
+    <div class="hint">The reply-language rule is added automatically. Applies from the next conversation.</div>
+    <div class="toggle"><input type="checkbox" id="search"><label for="search">Google Search grounding</label></div>
+    <div class="hint">Lets Gemini look things up. On the free tier this uses a separate quota and may fail on some models.</div>
+  </section>
+
+  <section class="card">
+    <h2>Wake words <small>on-device, restart required</small></h2>
+    <div class="row">
+      <div><label for="wake1">Wake word 1</label><select id="wake1"></select></div>
+      <div><label for="wake2">Wake word 2</label><select id="wake2"></select></div>
+    </div>
+    <div class="hint">The button on the device always works too.</div>
+  </section>
+
+  <section class="card">
+    <h2>Audio</h2>
+    <label for="volume">Speaker volume</label>
+    <div class="range"><input type="range" id="volume" min="0" max="100"><output id="volumeOut"></output></div>
+    <label for="mic_gain">Microphone gain</label>
+    <div class="range"><input type="range" id="mic_gain" min="0" max="36"><output id="mic_gainOut"></output></div>
+    <div class="row">
+      <div>
+        <label for="idle_timeout">End conversation after silence (s)</label>
+        <input type="number" id="idle_timeout" min="5" max="600">
+      </div>
+      <div>
+        <label for="echo_tail_ms">Mic lock tail after Gemini speaks (ms)</label>
+        <input type="number" id="echo_tail_ms" min="0" max="3000" step="50">
+      </div>
+    </div>
+    <div class="hint">The mic is muted while Gemini talks so it can't hear itself. Press the device button to cut a reply.</div>
+    <div class="toggle"><input type="checkbox" id="listen_beep"><label for="listen_beep">Short bip when the mic opens again</label></div>
+  </section>
+
+  <section class="card">
+    <h2>Home Assistant <small>control your home by voice</small></h2>
+    <div class="toggle" style="margin-top:0"><input type="checkbox" id="ha_enabled"><label for="ha_enabled">Let Gemini control Home Assistant</label></div>
+    <div class="row" style="margin-top:4px">
+      <div><label for="ha_url">Home Assistant URL</label><input type="text" id="ha_url" placeholder="http://192.168.1.10:8123" autocomplete="off"></div>
+      <div><label for="ha_token">Long-lived access token</label><input type="password" id="ha_token" autocomplete="off"></div>
+    </div>
+    <div class="btns" style="margin-top:10px"><button id="haTest">Test connection</button></div>
+    <div class="hint" id="haResult">Needs the built-in <b>MCP Server</b> integration in HA and a token from an administrator's profile → Security → Long-lived access tokens. Gemini can only see and control entities exposed to Assist.</div>
+  </section>
+
+  <section class="card">
+    <h2>Connection</h2>
+    <div class="row">
+      <div><label for="wifi_ssid">Wi-Fi network (2.4 GHz)</label><input type="text" id="wifi_ssid" autocomplete="off"></div>
+      <div><label for="wifi_pass">Wi-Fi password</label><input type="password" id="wifi_pass" autocomplete="new-password"></div>
+    </div>
+    <label for="api_key">Gemini API key</label>
+    <input type="password" id="api_key" autocomplete="off">
+    <div class="hint">Leave password/key empty to keep the current ones. Changing Wi-Fi restarts the device.</div>
+  </section>
+
+  <section class="card">
+    <h2>Firmware update <small id="fwCur"></small></h2>
+    <div class="btns" style="align-items:center">
+      <input type="file" id="otaFile" accept=".bin" style="flex:1;min-width:0">
+      <button id="otaBtn" disabled>Install</button>
+    </div>
+    <progress id="otaProg" max="100" value="0" style="width:100%;margin-top:10px" hidden></progress>
+    <div class="hint" id="otaMsg">Pick <b>build/gemini-echo.bin</b>. Settings are kept; if the new firmware fails to start, the device goes back to the current one. Wake word models only change over USB.</div>
+  </section>
+</main>
+
+<div class="savebar"><div class="in">
+  <span class="msg" id="saveMsg">No changes</span>
+  <button class="primary" id="saveBtn" disabled>Save</button>
+</div></div>
+
+<script>
+const VOICES = [
+  ["Puck","Upbeat"],["Zephyr","Bright"],["Kore","Firm"],["Charon","Informative"],["Fenrir","Excitable"],
+  ["Leda","Youthful"],["Orus","Firm"],["Aoede","Breezy"],["Callirrhoe","Easy-going"],["Autonoe","Bright"],
+  ["Enceladus","Breathy"],["Iapetus","Clear"],["Umbriel","Easy-going"],["Algieba","Smooth"],["Despina","Smooth"],
+  ["Erinome","Clear"],["Algenib","Gravelly"],["Rasalgethi","Informative"],["Laomedeia","Upbeat"],["Achernar","Soft"],
+  ["Alnilam","Firm"],["Schedar","Even"],["Gacrux","Mature"],["Pulcherrima","Forward"],["Achird","Friendly"],
+  ["Zubenelgenubi","Casual"],["Vindemiatrix","Gentle"],["Sadachbia","Lively"],["Sadaltager","Knowledgeable"],["Sulafat","Warm"]
+];
+const $ = id => document.getElementById(id);
+const FIELDS = ["voice","language","prompt","wake1","wake2","volume","mic_gain","idle_timeout","echo_tail_ms","listen_beep","wifi_ssid","wifi_pass","api_key","search","ha_enabled","ha_url","ha_token"];
+const SECRETS = ["wifi_pass","api_key","ha_token"];
+let saved = {}, model = "", savedModel = "";
+
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} : {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+  if (!r.ok) throw new Error(r.status + " " + r.statusText);
+  return r.json();
+}
+
+function current() {
+  const o = {model};
+  for (const f of FIELDS) {
+    const el = $(f);
+    o[f] = el.type === "checkbox" ? el.checked : (el.type === "range" || el.type === "number") ? Number(el.value) : el.value;
+  }
+  return o;
+}
+
+function dirty() {
+  const c = current(), changed = [];
+  for (const k in c) {
+    if (SECRETS.includes(k) ? c[k] !== "" : c[k] !== saved[k]) changed.push(k);
+  }
+  return changed;
+}
+
+function refreshSave() {
+  const d = dirty();
+  $("saveBtn").disabled = d.length === 0;
+  const restart = d.some(k => ["wifi_ssid","wifi_pass","wake1","wake2"].includes(k));
+  $("saveMsg").textContent = d.length ? `${d.length} unsaved change${d.length > 1 ? "s" : ""}${restart ? " · device will restart" : ""}` : "No changes";
+}
+
+function fillSelect(sel, items, value) {
+  sel.innerHTML = "";
+  for (const [v, t] of items) sel.add(new Option(t, v));
+  if (value && ![...sel.options].some(o => o.value === value)) sel.add(new Option(value, value));
+  sel.value = value;
+}
+
+async function loadConfig() {
+  const c = await api("/api/config");
+  fillSelect($("voice"), VOICES.map(([n, d]) => [n, `${n} — ${d}`]), c.voice);
+  const pretty = w => w.split(" or ")[0].replace(/,/g, " ").replace(/\bhitelly\b/i, "Hi Telly").replace(/^Heyprinter$/i, "Hey Printer")
+                       .replace(/\b\w/g, ch => ch.toUpperCase()).replace(/\s+/g, " ").trim();
+  const wakes = c.wake_models.map(w => [w.name, pretty(w.word)]).sort((x, y) => x[1].localeCompare(y[1]));
+  fillSelect($("wake1"), wakes, c.wake1);
+  fillSelect($("wake2"), [["", "— none —"], ...wakes], c.wake2);
+  for (const f of ["language","prompt","volume","mic_gain","idle_timeout","echo_tail_ms","wifi_ssid"]) $(f).value = c[f];
+  $("search").checked = c.search;
+  $("listen_beep").checked = c.listen_beep;
+  $("ha_enabled").checked = c.ha_enabled;
+  $("ha_url").value = c.ha_url;
+  $("ha_token").value = "";
+  $("ha_token").placeholder = c.ha_token_set ? "•••••••• (unchanged)" : "paste token";
+  $("wifi_pass").value = ""; $("api_key").value = "";
+  $("wifi_pass").placeholder = c.wifi_pass_set ? "•••••••• (unchanged)" : "open network";
+  $("api_key").placeholder = c.api_key_hint ? `key ${c.api_key_hint} (unchanged)` : "paste your key";
+  model = savedModel = c.model;
+  for (const f of ["volume","mic_gain"]) updateOut(f);
+  saved = current();
+  for (const k of SECRETS) saved[k] = "";
+  refreshSave();
+}
+
+function updateOut(f) {
+  $(f + "Out").textContent = f === "volume" ? $(f).value + "%" : $(f).value + " dB";
+}
+
+let modelList = [];
+function renderModels() {
+  const box = $("models");
+  if (!modelList.length) { box.innerHTML = `<div class="empty">No Live models found.</div>`; return; }
+  if (!modelList.some(m => m.id === model)) modelList.unshift({id: model, name: model});
+  box.innerHTML = "";
+  for (const m of modelList) {
+    const row = document.createElement("div");
+    row.className = "model";
+    row.innerHTML = `<input type="radio" name="model"><div><div></div><div class="id"></div></div><span class="res"></span><button>Test</button>`;
+    const [radio, info, res, btn] = row.children;
+    radio.checked = m.id === model;
+    radio.onchange = () => { model = m.id; refreshSave(); };
+    info.children[0].textContent = m.name + (m.id === savedModel ? "  · current" : "");
+    info.children[1].textContent = m.id;
+    m.res = res; m.btn = btn;
+    if (m.result) showResult(m);
+    btn.onclick = () => testModel(m);
+    row.onclick = e => { if (e.target === row || info.contains(e.target)) { radio.checked = true; radio.onchange(); } };
+    box.appendChild(row);
+  }
+}
+
+function showResult(m) {
+  const r = m.result;
+  m.res.className = "res " + (r.ok ? "ok" : "bad");
+  m.res.textContent = r.ok ? `✓ ready in ${r.ms} ms` : `✗ ${r.error}`;
+  m.res.title = r.error || "";
+}
+
+async function loadModels() {
+  $("models").innerHTML = `<div class="empty">Loading models…</div>`;
+  try {
+    const r = await api("/api/models");
+    if (r.error) { $("models").innerHTML = `<div class="empty bad"></div>`; $("models").firstChild.textContent = r.error; return; }
+    modelList = r.models;
+    renderModels();
+  } catch (e) { $("models").innerHTML = `<div class="empty bad">Couldn't load models: ${e.message}</div>`; }
+}
+
+async function testModel(m) {
+  m.btn.disabled = true;
+  m.res.className = "res"; m.res.textContent = "testing…";
+  try { m.result = await api("/api/test_model", {model: m.id}); }
+  catch (e) { m.result = {ok:false, error:e.message}; }
+  showResult(m);
+  m.btn.disabled = false;
+}
+
+$("testAll").onclick = async () => {
+  $("testAll").disabled = true;
+  for (const m of modelList) await testModel(m);
+  $("testAll").disabled = false;
+};
+$("reloadModels").onclick = loadModels;
+
+async function loadStatus() {
+  try {
+    const s = await api("/api/status");
+    $("state").className = "pill " + s.state;
+    $("stateTxt").textContent = {idle:"Idle — listening for wake word", connecting:"Connecting…", active:"In conversation"}[s.state] || s.state;
+    $("ssid").textContent = s.ap_mode ? "setup hotspot" : (s.ssid || "–");
+    $("rssi").textContent = s.rssi ? s.rssi + " dBm" : "–";
+    $("ip").textContent = s.ip || (s.ap_mode ? "192.168.4.1" : "–");
+    const u = s.uptime_s; $("uptime").textContent = u > 3600 ? `${Math.floor(u/3600)}h ${Math.floor(u%3600/60)}m` : `${Math.floor(u/60)}m ${u%60}s`;
+    $("fw").textContent = "firmware " + s.firmware;
+    $("fwCur").textContent = "running " + s.firmware;
+    $("apBanner").hidden = !s.ap_mode;
+    $("lastErr").hidden = !s.last_error;
+    $("lastErr").textContent = s.last_error ? "Last Gemini error: " + s.last_error : "";
+  } catch (e) { $("stateTxt").textContent = "offline"; $("state").className = "pill"; }
+}
+
+$("saveBtn").onclick = async () => {
+  const c = current(), body = {};
+  for (const k of dirty()) body[k] = c[k];
+  $("saveBtn").disabled = true;
+  $("saveMsg").textContent = "Saving…";
+  try {
+    const r = await api("/api/config", body);
+    if (r.restart) {
+      $("saveMsg").textContent = "Saved. Restarting device…";
+      setTimeout(() => location.reload(), 9000);
+    } else {
+      $("saveMsg").textContent = "Saved ✓";
+      await loadConfig();
+      renderModels();
+      setTimeout(refreshSave, 2000);
+    }
+  } catch (e) { $("saveMsg").textContent = "Save failed: " + e.message; $("saveBtn").disabled = false; }
+};
+
+$("haTest").onclick = async () => {
+  const out = $("haResult");
+  if (dirty().some(k => k.startsWith("ha_"))) { out.className = "hint bad"; out.textContent = "Save your Home Assistant changes first, then test."; return; }
+  $("haTest").disabled = true;
+  out.className = "hint"; out.textContent = "Connecting to Home Assistant…";
+  try {
+    const r = await api("/api/ha_test", {});
+    out.className = "hint " + (r.ok ? "ok" : "bad");
+    out.textContent = r.ok ? `✓ Connected — ${r.tools.length} tools: ${r.tools.join(", ")}` : `✗ ${r.error}`;
+  } catch (e) { out.className = "hint bad"; out.textContent = "✗ " + e.message; }
+  $("haTest").disabled = false;
+};
+
+$("talkBtn").onclick = () => api("/api/action", {action:"talk"}).then(loadStatus);
+$("beepBtn").onclick = () => api("/api/action", {action:"beep"});
+$("restartBtn").onclick = async () => {
+  await api("/api/action", {action:"restart"});
+  $("saveMsg").textContent = "Restarting…";
+  setTimeout(() => location.reload(), 9000);
+};
+
+$("otaFile").onchange = () => { $("otaBtn").disabled = !$("otaFile").files.length; };
+$("otaBtn").onclick = () => {
+  const file = $("otaFile").files[0], msg = $("otaMsg"), prog = $("otaProg");
+  if (!file) return;
+  $("otaBtn").disabled = true;
+  prog.hidden = false; prog.value = 0;
+  msg.className = "hint"; msg.textContent = "Uploading…";
+  const x = new XMLHttpRequest();
+  x.open("POST", "/api/ota");
+  x.upload.onprogress = e => {
+    if (!e.lengthComputable) return;
+    prog.value = e.loaded * 100 / e.total;
+    msg.textContent = e.loaded < e.total ? `Uploading… ${Math.round(prog.value)}%` : "Checking image…";
+  };
+  const fail = text => { msg.className = "hint bad"; msg.textContent = "✗ " + text; prog.hidden = true; $("otaBtn").disabled = false; };
+  x.onload = () => {
+    let r = {};
+    try { r = JSON.parse(x.responseText); } catch (e) {}
+    if (!r.ok) return fail(r.error || `HTTP ${x.status}`);
+    msg.className = "hint ok"; msg.textContent = `✓ Installed ${r.version}. Restarting…`;
+    setTimeout(() => location.reload(), 12000);
+  };
+  x.onerror = () => fail("upload failed (connection lost)");
+  x.setRequestHeader("Content-Type", "application/octet-stream");
+  x.send(file);
+};
+
+for (const f of FIELDS) $(f).addEventListener("input", () => { if ($(f + "Out")) updateOut(f); refreshSave(); });
+
+loadConfig().then(loadModels).catch(e => $("saveMsg").textContent = "Couldn't load settings: " + e.message);
+loadStatus();
+setInterval(loadStatus, 3000);
+</script>
+</body>
+</html>

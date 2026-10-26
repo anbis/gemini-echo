@@ -1,0 +1,23 @@
+# ESP-IDF build output and generated config
+/build
+/managed_components
+sdkconfig
+sdkconfig.old
+
+# Personal build-time defaults (Wi-Fi, API key, HA URL)
+main/secrets.h
+
+# Editors / OS / Python
+.vscode/
+.cache/
+.idea/
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
+
+# iCloud: build output lives in .nosync folders (build/ and managed_components/ are symlinks)
+*.nosync
+
+# Personal Claude Code context (device/HA addresses) — synced via iCloud, not published
+CLAUDE.local.md
