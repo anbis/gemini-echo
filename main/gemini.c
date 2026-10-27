@@ -104,6 +104,21 @@ static void send_setup(void)
         }
     }
     free(ha_text);
+    char today[40];
+    if (app_today(today, sizeof(today))) {
+        strlcat(prompt, "\nToday is ", cap);
+        strlcat(prompt, today, cap);
+        strlcat(prompt, " (UTC date).", cap);
+    }
+    char *mem = memory_context();
+    if (mem) {
+        // after the HA text, which is static, so the notes come last
+        size_t need = strlen(prompt) + strlen(mem) + 3;
+        if (need > cap) prompt = heap_caps_realloc(prompt, cap = need, MALLOC_CAP_SPIRAM);
+        strlcat(prompt, "\n\n", cap);
+        strlcat(prompt, mem, cap);
+        free(mem);
+    }
     ESP_LOGI(TAG, "model %s, voice %s", model, voice);
 
     cJSON *root = cJSON_CreateObject();
@@ -187,10 +202,14 @@ static void handle_message(const char *data, int len)
             free(pcm);
         }
         cJSON *t;
-        if ((t = cJSON_GetObjectItem(cJSON_GetObjectItem(sc, "inputTranscription"), "text")) && cJSON_IsString(t))
+        if ((t = cJSON_GetObjectItem(cJSON_GetObjectItem(sc, "inputTranscription"), "text")) && cJSON_IsString(t)) {
             ESP_LOGI(TAG, "you: %s", t->valuestring);
-        if ((t = cJSON_GetObjectItem(cJSON_GetObjectItem(sc, "outputTranscription"), "text")) && cJSON_IsString(t))
+            memory_note(MEM_USER, t->valuestring);
+        }
+        if ((t = cJSON_GetObjectItem(cJSON_GetObjectItem(sc, "outputTranscription"), "text")) && cJSON_IsString(t)) {
             ESP_LOGI(TAG, "gemini: %s", t->valuestring);
+            memory_note(MEM_ASSISTANT, t->valuestring);
+        }
         if (cJSON_IsTrue(cJSON_GetObjectItem(sc, "turnComplete"))) {
             ESP_LOGI(TAG, "turn complete");
             s_drop_turn = false;
@@ -294,6 +313,9 @@ static void tool_task(void *arg)
             if (!cJSON_IsString(name)) continue;
             char *args = cJSON_PrintUnformatted(cJSON_GetObjectItem(fc, "args"));
             ESP_LOGI(TAG, "tool call %s %s", name->valuestring, args ? args : "{}");
+            char note[200];
+            snprintf(note, sizeof(note), "%s %.150s", name->valuestring, args ? args : "{}");
+            memory_note(MEM_TOOL, note);
             free(args);
             cJSON *r = ha_call_tool(name->valuestring, cJSON_GetObjectItem(fc, "args"));
             cJSON *e = cJSON_GetObjectItem(r, "error");

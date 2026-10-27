@@ -18,6 +18,8 @@
 #include "config.h"
 #include "settings.h"
 #include "mdns.h"
+#include "esp_netif_sntp.h"
+#include <time.h>
 #include "cJSON.h"
 
 static const char *TAG = "main";
@@ -98,6 +100,17 @@ static void start_setup_ap(void)
     esp_wifi_set_config(WIFI_IF_AP, &ap);
 }
 
+// Today's date (UTC) once SNTP has set the clock; false before that.
+bool app_today(char *buf, size_t size)
+{
+    time_t now = time(NULL);
+    struct tm tm;
+    if (now < 1735689600) return false;   // 2025-01-01: clock not set yet
+    gmtime_r(&now, &tm);
+    strftime(buf, size, "%Y-%m-%d, %A", &tm);
+    return true;
+}
+
 static void mdns_start(void)
 {
     if (mdns_init() != ESP_OK) return;
@@ -162,6 +175,7 @@ static void begin_session(void)
 static void end_session(bool error)
 {
     gemini_stop();
+    memory_session_end();
     play_clear();
     gemini_err_t kind = gemini_error_kind();
     if (!error && kind == ERR_NONE) {
@@ -208,6 +222,7 @@ void app_main(void)
     int chunk = sr_init();
     gemini_init();
     ha_init();
+    memory_init();
     audio_start(chunk, audio_feed);
     sr_start();
     wifi_init();
@@ -218,6 +233,8 @@ void app_main(void)
 
     if (xEventGroupWaitBits(s_wifi_ev, WIFI_UP, false, true, pdMS_TO_TICKS(20000)) & WIFI_UP) {
         play_tone(TONE_BOOT);
+        esp_sntp_config_t sntp = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
+        esp_netif_sntp_init(&sntp);   // dates for the conversation memory
         cJSON_Delete(ha_function_declarations());   // warm the HA tool cache
         ESP_LOGI(TAG, "ready - say the wake word or press the button; settings at http://" HOSTNAME ".local");
     } else {

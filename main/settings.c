@@ -37,6 +37,8 @@ static void set_defaults(settings_t *c)
     c->search = GEMINI_ENABLE_SEARCH;
     strlcpy(c->ha_url, HA_URL, sizeof(c->ha_url));
     c->listen_beep = LISTEN_BEEP;
+    c->memory = MEMORY_ENABLED;
+    strlcpy(c->memory_model, MEMORY_MODEL, sizeof(c->memory_model));
 }
 
 void settings_load(void)

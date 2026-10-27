@@ -64,6 +64,7 @@ void   web_start(void);
 const char *app_state_name(void);
 bool   app_wifi_is_ap(void);
 bool   web_ota_active(void);       // firmware upload in progress
+bool   app_today(char *buf, size_t size);   // "2026-10-27, Tuesday" (UTC), false until the clock is set
 
 // ---- gemini.c ----
 void   gemini_init(void);
@@ -75,3 +76,12 @@ void   gemini_set_error(const char *msg, int len);
 typedef enum { ERR_NONE, ERR_QUOTA, ERR_APIKEY, ERR_CONNECT } gemini_err_t;
 gemini_err_t gemini_error_kind(void);
 const char *gemini_last_error(void);
+
+// ---- memory.c ----
+typedef enum { MEM_USER = 1, MEM_ASSISTANT = 2, MEM_TOOL = 3 } memory_role_t;
+void   memory_init(void);
+void   memory_note(memory_role_t role, const char *text);   // transcript of the session in progress
+void   memory_session_end(void);   // queue the transcript for summarizing
+char  *memory_context(void);       // text for the system instruction (caller frees), or NULL
+void   memory_clear(void);
+cJSON *memory_status(void);

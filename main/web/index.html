@@ -66,6 +66,8 @@ button:disabled{opacity:.5;cursor:default}
   padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px))}
 .savebar .in{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:12px}
 .savebar .msg{flex:1;font-size:13px;color:var(--muted)}
+.notes{white-space:pre-wrap;background:var(--field);border:1px solid var(--line);border-radius:9px;padding:9px 11px;
+  font-size:13px;max-height:220px;overflow:auto;margin-top:10px}
 .banner{background:#fff4e5;color:#7a2e0e;border:1px solid #f5c08b;border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:14px}
 @media (prefers-color-scheme:dark){.banner{background:#2b1d0e;color:#f8c48a;border-color:#6b4419}}
 </style>
@@ -170,6 +172,18 @@ button:disabled{opacity:.5;cursor:default}
   </section>
 
   <section class="card">
+    <h2>Memory <small>continue where you stopped</small></h2>
+    <div class="toggle" style="margin-top:0"><input type="checkbox" id="memory"><label for="memory">Remember conversations</label></div>
+    <label for="memory_model" style="margin-top:12px">Summary model</label>
+    <input type="text" id="memory_model" autocomplete="off">
+    <div class="notes" id="memNotes">–</div>
+    <div class="btns" style="margin-top:10px;align-items:center">
+      <button id="memClear">Clear memory</button><span class="hint" id="memMsg" style="margin:0"></span>
+    </div>
+    <div class="hint">After each conversation a text model updates a short summary of it; the next conversation starts with that summary. Only the latest summary is kept.</div>
+  </section>
+
+  <section class="card">
     <h2>Connection</h2>
     <div class="row">
       <div><label for="wifi_ssid">Wi-Fi network (2.4 GHz)</label><input type="text" id="wifi_ssid" autocomplete="off"></div>
@@ -206,7 +220,7 @@ const VOICES = [
   ["Zubenelgenubi","Casual"],["Vindemiatrix","Gentle"],["Sadachbia","Lively"],["Sadaltager","Knowledgeable"],["Sulafat","Warm"]
 ];
 const $ = id => document.getElementById(id);
-const FIELDS = ["voice","language","prompt","wake1","wake2","volume","mic_gain","idle_timeout","echo_tail_ms","listen_beep","wifi_ssid","wifi_pass","api_key","search","ha_enabled","ha_url","ha_token"];
+const FIELDS = ["voice","language","prompt","wake1","wake2","volume","mic_gain","idle_timeout","echo_tail_ms","listen_beep","memory","memory_model","wifi_ssid","wifi_pass","api_key","search","ha_enabled","ha_url","ha_token"];
 const SECRETS = ["wifi_pass","api_key","ha_token"];
 let saved = {}, model = "", savedModel = "";
 
@@ -255,9 +269,10 @@ async function loadConfig() {
   const wakes = c.wake_models.map(w => [w.name, pretty(w.word)]).sort((x, y) => x[1].localeCompare(y[1]));
   fillSelect($("wake1"), wakes, c.wake1);
   fillSelect($("wake2"), [["", "— none —"], ...wakes], c.wake2);
-  for (const f of ["language","prompt","volume","mic_gain","idle_timeout","echo_tail_ms","wifi_ssid"]) $(f).value = c[f];
+  for (const f of ["language","prompt","volume","mic_gain","idle_timeout","echo_tail_ms","wifi_ssid","memory_model"]) $(f).value = c[f];
   $("search").checked = c.search;
   $("listen_beep").checked = c.listen_beep;
+  $("memory").checked = c.memory;
   $("ha_enabled").checked = c.ha_enabled;
   $("ha_url").value = c.ha_url;
   $("ha_token").value = "";
@@ -332,9 +347,23 @@ $("testAll").onclick = async () => {
 };
 $("reloadModels").onclick = loadModels;
 
+async function loadMemory() {
+  try {
+    const m = await api("/api/memory");
+    $("memNotes").textContent = m.notes || "Nothing remembered yet.";
+    $("memMsg").className = "hint" + (m.error ? " bad" : "");
+    $("memMsg").textContent = m.updating ? "Updating…" : m.error ? "Last update failed: " + m.error
+      : m.pending_chars ? "Latest conversation not summarized yet" : "";
+    if (m.updating) setTimeout(loadMemory, 2000);
+  } catch (e) { $("memMsg").textContent = "Couldn't load memory: " + e.message; }
+}
+
+let lastState = "";
 async function loadStatus() {
   try {
     const s = await api("/api/status");
+    if (s.state === "idle" && lastState && lastState !== "idle") setTimeout(loadMemory, 1500);
+    lastState = s.state;
     $("state").className = "pill " + s.state;
     $("stateTxt").textContent = {idle:"Idle — listening for wake word", connecting:"Connecting…", active:"In conversation"}[s.state] || s.state;
     $("ssid").textContent = s.ap_mode ? "setup hotspot" : (s.ssid || "–");
@@ -381,6 +410,13 @@ $("haTest").onclick = async () => {
   $("haTest").disabled = false;
 };
 
+$("memClear").onclick = async () => {
+  $("memClear").disabled = true;
+  try { await api("/api/memory", {action:"clear"}); await loadMemory(); $("memMsg").textContent = "Cleared ✓"; }
+  catch (e) { $("memMsg").textContent = "✗ " + e.message; }
+  $("memClear").disabled = false;
+};
+
 $("talkBtn").onclick = () => api("/api/action", {action:"talk"}).then(loadStatus);
 $("beepBtn").onclick = () => api("/api/action", {action:"beep"});
 $("restartBtn").onclick = async () => {
@@ -420,6 +456,7 @@ for (const f of FIELDS) $(f).addEventListener("input", () => { if ($(f + "Out"))
 
 loadConfig().then(loadModels).catch(e => $("saveMsg").textContent = "Couldn't load settings: " + e.message);
 loadStatus();
+loadMemory();
 setInterval(loadStatus, 3000);
 </script>
 </body>

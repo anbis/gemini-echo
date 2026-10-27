@@ -140,7 +140,7 @@ static bool mcp_initialize(void)
     cJSON_AddObjectToObject(p, "capabilities");
     cJSON *ci = cJSON_AddObjectToObject(p, "clientInfo");
     cJSON_AddStringToObject(ci, "name", "gemini-echo");
-    cJSON_AddStringToObject(ci, "version", "1.3");
+    cJSON_AddStringToObject(ci, "version", "1.4");
     cJSON *root;
     if (!rpc("initialize", p, &root)) return false;
     cJSON_Delete(root);

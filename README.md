@@ -14,6 +14,9 @@ Optionally it controls your Home Assistant through HA's built-in MCP server.
 - **Natural conversation**: follow-ups need no wake word; words spoken right after the wake word aren't lost
 - **No self-hearing**: the mic is muted while Gemini talks; press the button to cut a reply.
   A short bip says when the mic is open again (can be turned off)
+- **Conversation memory**: after each conversation a text model (`gemini-flash-lite-latest`) updates a
+  short summary of it, and the next conversation starts from there. Only the latest summary is kept (in NVS);
+  view it or clear it in the web UI
 - **OTA firmware updates** from the web UI or `tools/ota.py`, with automatic rollback if the new firmware fails to start
 - **Web UI** at `http://gemini-echo.local`: model picker with live model list and per-model test, 30 voices,
   reply language, system prompt, Google Search, wake words, volume, mic gain, timeouts, Wi-Fi, API key
@@ -98,6 +101,7 @@ mic ─► ES8311 ─► I2S 16 kHz stereo (L: mic, R: DAC loopback)
 | `main/wake.c` | ESP-SR audio front-end, wake word, mic lock |
 | `main/gemini.c` | Live API session, uplink, playback, tool calls, error classification |
 | `main/ha.c` | Home Assistant MCP client |
+| `main/memory.c` | conversation memory: transcript, summary via `generateContent`, NVS |
 | `main/web.c`, `main/web/index.html` | web UI, JSON API, OTA upload |
 | `main/settings.c` | settings in NVS (defaults from `config.h` / `secrets.h`) |
 | `main/clips/*.pcm` | spoken warnings (Ukrainian; regenerate with `tools/gen_clips.py`) |
@@ -115,6 +119,8 @@ python3 tools/ota.py gemini-echo.local                      # firmware update ov
 ## Notes
 
 - The web UI has no login — keep the device on a trusted network.
+- Conversation memory sends each conversation's transcript to the Gemini API once more (a `generateContent`
+  call with your key) to update the summary. Turn it off in the web UI if you don't want that.
 - Google Search grounding uses a separate quota on the free tier and fails on some Live models.
 - Speaker and mic sit millimetres apart, so echo cancellation alone can't stop Gemini hearing itself
   at full volume — hence the mic lock instead of voice barge-in.

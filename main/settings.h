@@ -23,6 +23,9 @@ typedef struct {
     // v1.3. Appended fields must be int-aligned: a bool here would land in the old blob's
     // tail padding and load as 0 instead of its default.
     int  listen_beep;    // bip when the mic opens after Gemini spoke
+    // v1.4: conversation memory (memory.c)
+    int  memory;            // keep a summary of past conversations
+    char memory_model[64];  // text model that writes the summary
 } settings_t;
 
 extern settings_t g_cfg;

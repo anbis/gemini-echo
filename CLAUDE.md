@@ -43,7 +43,8 @@ WS 3, DOUT 48, DIN 4 · NS4150B amp enable 18 · button 41 (active low) · no LE
 | `main/wake.c` | ESP-SR AFE ("MR": AEC→VAD→AGC→WakeNet9), mic lock, feeds uplink |
 | `main/gemini.c` | Live WebSocket session: setup, uplink task, downlink audio, toolCall → HA, error classification |
 | `main/ha.c` | MCP client for HA `/api/mcp` (JSON-RPC: initialize, tools/list, tools/call; JSON or SSE replies) |
-| `main/web.c` + `main/web/index.html` | web UI + JSON API (`/api/config`, `/status`, `/action`, `/models`, `/test_model`, `/ha_test`, `/ota`) |
+| `main/memory.c` | conversation memory: collects transcriptions, summarizes after the session, NVS key `memory` |
+| `main/web.c` + `main/web/index.html` | web UI + JSON API (`/api/config`, `/status`, `/action`, `/models`, `/test_model`, `/ha_test`, `/ota`, `/memory`) |
 | `main/settings.c` | `settings_t` blob in NVS; defaults from `config.h` ← `secrets.h` |
 | `main/clips/*.pcm` | spoken warnings, 16 kHz mono s16le (Ukrainian, Puck voice); `tools/gen_clips.py` regenerates |
 
@@ -83,6 +84,13 @@ Partitions (`partitions.csv`): `ota_0`/`ota_1` 2.875 MB each (image ~2.3 MB), `m
 - **Listen bip** (`TONE_LISTEN`, setting `listen_beep`): played when the mic lock releases in ACTIVE.
   `play_reply_seq()` counts 24 kHz (Gemini) pushes; only Gemini audio newer than the last unlock can lock the mic,
   so the bip itself doesn't re-lock it.
+- **Conversation memory** (v1.4, user's request: "continue from last point", clear from UI, only the latest
+  point): input/output transcriptions and tool calls are collected during a session; `end_session` queues them and
+  `memory_task` calls `generateContent` (`memory_model`, default `gemini-flash-lite-latest`, ~1 s) with the
+  previous notes + transcript + today's date. The result (≤3000 bytes) replaces the notes in NVS key `memory` and
+  is appended to the next session's systemInstruction. If the summary fails, the raw transcript stays pending (RAM)
+  and is sent as-is. `memory_clear()` bumps a generation counter so a summary in flight is discarded.
+  SNTP (`pool.ntp.org`) gives the date (UTC) to the summary and to Gemini, so "tomorrow" becomes a real date.
 - Web UI has **no login** — the user considers the LAN trusted and declined adding protections.
 
 ## Gemini Live API notes

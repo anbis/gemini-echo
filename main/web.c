@@ -119,6 +119,8 @@ static esp_err_t h_get_config(httpd_req_t *req)
     cJSON_AddStringToObject(root, "ha_url", g_cfg.ha_url);
     cJSON_AddBoolToObject(root, "ha_token_set", g_cfg.ha_token[0] != 0);
     cJSON_AddBoolToObject(root, "listen_beep", g_cfg.listen_beep);
+    cJSON_AddBoolToObject(root, "memory", g_cfg.memory);
+    cJSON_AddStringToObject(root, "memory_model", g_cfg.memory_model);
     settings_unlock();
 
     const char *names[16], *words[16];
@@ -166,6 +168,10 @@ static esp_err_t h_post_config(httpd_req_t *req)
     if (cJSON_IsString(ha_tok) && ha_tok->valuestring[0]) take_str(in, "ha_token", g_cfg.ha_token, sizeof(g_cfg.ha_token));
     cJSON *beep = cJSON_GetObjectItem(in, "listen_beep");
     if (cJSON_IsBool(beep)) g_cfg.listen_beep = cJSON_IsTrue(beep);
+    cJSON *mem = cJSON_GetObjectItem(in, "memory");
+    if (cJSON_IsBool(mem)) g_cfg.memory = cJSON_IsTrue(mem);
+    cJSON *mm = cJSON_GetObjectItem(in, "memory_model");
+    if (cJSON_IsString(mm) && mm->valuestring[0]) take_str(in, "memory_model", g_cfg.memory_model, sizeof(g_cfg.memory_model));
     volume = g_cfg.volume;
     mic_gain = g_cfg.mic_gain;
     settings_unlock();
@@ -403,6 +409,18 @@ static esp_err_t h_ha_test(httpd_req_t *req)
     return send_json(req, ha_test());
 }
 
+// GET: saved conversation notes. POST {"action":"clear"}: forget them.
+static esp_err_t h_memory(httpd_req_t *req)
+{
+    if (req->method == HTTP_POST) {
+        cJSON *in = read_json(req);
+        cJSON *a = in ? cJSON_GetObjectItem(in, "action") : NULL;
+        if (cJSON_IsString(a) && !strcmp(a->valuestring, "clear")) memory_clear();
+        cJSON_Delete(in);
+    }
+    return send_json(req, memory_status());
+}
+
 // ---------------------------------------------------------------- firmware update (OTA)
 // POST /api/ota with the raw app image (build/gemini-echo.bin) as the body.
 // The new image boots once in "pending verify"; main.c confirms it, otherwise the bootloader rolls back.
@@ -515,6 +533,8 @@ void web_start(void)
         { .uri = "/api/test_model", .method = HTTP_POST, .handler = h_test_model },
         { .uri = "/api/ha_test", .method = HTTP_POST, .handler = h_ha_test },
         { .uri = "/api/ota", .method = HTTP_POST, .handler = h_ota },
+        { .uri = "/api/memory", .method = HTTP_GET, .handler = h_memory },
+        { .uri = "/api/memory", .method = HTTP_POST, .handler = h_memory },
     };
     for (int i = 0; i < sizeof(uris) / sizeof(uris[0]); i++) httpd_register_uri_handler(srv, &uris[i]);
     ESP_LOGI(TAG, "web UI on port 80");

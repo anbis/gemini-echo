@@ -41,6 +41,10 @@
 #define ECHO_TAIL_MS             600
 // Short "bip" when the mic opens again after Gemini spoke: your turn to talk
 #define LISTEN_BEEP              1
+// Conversation memory: after each conversation a text model folds its transcript into a short
+// summary (NVS), which the next session gets in its system instruction. Clear it in the web UI.
+#define MEMORY_ENABLED           1
+#define MEMORY_MODEL             "gemini-flash-lite-latest"
 
 // Wake words: ESP-SR pre-trained WakeNet9 models bundled via sdkconfig.defaults
 // (CONFIG_SR_WN_WN9_*); up to two of them are active, picked in the web UI.
